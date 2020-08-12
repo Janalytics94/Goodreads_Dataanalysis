@@ -100,7 +100,7 @@ The following table sums up which features are included in the explored data set
 variables<-c("BookID", "Title", "Authors", "Average_raiting", "ISBN", "ISBN 13", "Language_code", "Num_pages", "Ratings_count", "Text_reviews_count", "Pubication_date", "Publisher", "Price", "Genre")
 explanation<-c("The unique ID for each book/series",
  "The title of the book",
-  "The author of the particular book", "the average rating of the books, as decided by the users",
+  "The author of the particular book", "The average rating of the books, as decided by the users",
   "The ISBN number, gives detailed information about a book - such as edition and publisher",
   "The new format for ISBN, implemented in 2007. 13 digits",
   "Tells in which language the book is written",
