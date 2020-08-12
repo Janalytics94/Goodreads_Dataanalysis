@@ -5,5 +5,6 @@ Goodreads is a social cataloging platform, that allows users to search freely it
 To have more scope during the analysis of the data set, additional information of the books
 like the price and the genre was gathered.
 The genre data was added manually while the price data was scrapped from the website https://isbndb.com.
-Note: Please generate the R-Markdown File into a PDF Document.
-
+Notes: 
+1. Please generate the R-Markdown File into a PDF Document.
+2. In the branch book_price_crawler the original book-2.csv data set is complemented by the price in $ and the goodreads.csv dataset is generated. The genre data was added manually
