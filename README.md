@@ -4,5 +4,6 @@ The Goodreads-books data set is available on the platform www.kaggle.com and was
 Goodreads is a social cataloging platform, that allows users to search freely its database of books, annotations and reviews. Individuals can sign up and register books to generate library catalogs and reading lists as well as create their own groups of book suggestions, surveys, blogs, polls and discussions.
 To have more scope during the analysis of the data set, additional information of the books
 like the price and the genre was gathered.
-The genre data was added manually while the price data was scrapped from the website https://isbndb.com
+The genre data was added manually while the price data was scrapped from the website https://isbndb.com.
+Note: Please generate the R-Markdown File into a PDF Document.
 
