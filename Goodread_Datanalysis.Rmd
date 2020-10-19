@@ -1,6 +1,6 @@
 ---
 title: "The Goodreads Books - An Analysis"
-author: "Jana Vihs - 604930"
+author: "Janalytics94"
 date: "8/17/2020"
 bibliography: ["references.bib"]
 urlcolor: blue
