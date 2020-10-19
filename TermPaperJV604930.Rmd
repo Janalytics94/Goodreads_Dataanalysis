@@ -1,0 +1,778 @@
+---
+title: "The Goodreads Books - An Analysis"
+author: "Jana Vihs - 604930"
+date: "8/17/2020"
+bibliography: ["TermPaper_Dataanalysis1_JV604930.bib"]
+urlcolor: blue
+header_includes:
+  -\usepackage{wrapfig}
+  
+abstract: |
+ This termpaper covers an descriptive and exploratory analysis of the goodreads data set, which includes a wide variety of books and their corresponding information.  In the following, the data will be visualized to  illustrate the content and explore possible dependecies and correlations of the features. Finally a K-Means cluster analysis with respect to the price and the number of pages will be performed in order to find out, if there are any patterns or peculiarities between those two features.
+link-citations: true
+linkReferences: true
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 12pt
+-V breakurl: true
+-V hyphens=URL: true
+-V colorlinks: true
+documentclass: article
+
+figurelist: yes
+tablelist: yes
+floatsintext: yes
+output: 
+  pdf_document:
+    #citation_package: natbib
+    keep_tex: true
+    latex_engine: pdflatex
+    fig_width: 7
+    fig_height: 6
+    fig_caption: true
+    df_print: kable
+    number_sections: true
+linkcolor: black
+
+---
+\noindent
+\pagenumbering{gobble}
+\pagebreak
+\tableofcontents
+\pagebreak
+\listoffigures
+\pagenumbering{gobble}
+\listoftables
+
+\newpage
+\pagenumbering{arabic}
+```{r Setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = F)
+
+```
+
+```{r Load libraries}
+.packages = c("tidyverse", "devtools", "psych", "lubridate", "VIM", "moments", # cleaning and data analysis
+              "RColorBrewer", "gridExtra", "grid", # for visuals
+              "factoextra", # for k-means clustering
+              "ggcorrplot", # correlations
+              "knitr", "kableExtra", "pander", "formatR", "tinytex", "bookdown", "tufte" # tables and format document
+              )
+.inst <- .packages %in% installed.packages()    
+if(length(.packages[!.inst]) > 0) install.packages(.packages[!.inst])
+.loading <- lapply(.packages, require, character.only=TRUE)
+``` 
+
+```{r WARNING, include=FALSE, echo=FALSE}
+if(any(!unlist(.loading))) stop("looks like some library did not load")
+```
+
+\newpage
+# Introduction
+\
+*"Books are the windwos to the new worlds. Through them, I've explored the winterey lands of Narnia and cast a spell 
+at Hogwarts. I've danced with the Bennet sisters and attended the wedding of Theseus and Hippolyta. I've delved into
+coding languages and learned obout the Egyptian pyramids. Each world I've discovered has shown me the importance of 
+preserving and protecting these stories for the future."*`r tufte::quote_footer('--- Haimin Lee, Product Manager at Google Inc.')` 
+\
+
+According to an newspaper article published in year 2010 by the newspaper Augsburger Allgemeine the company Google Inc. calculated that 129.864.880 Books exist in the world [@augsburger_allgemeine_2010]. I assume now, in year 2020, there are much more. But how often do you end up buying a book that you thought you liked? After reading half the book you still do not feel the joy and enthusiasm you expected.
+Being an avid reader myself, I decided to get a little deeper in exploring the data describing books. On which information does someone decide to pick up a new book and read it?
+
+In order to get a sense of the criteria under which a book could be read, a simple explorative data analysis was performed on the `Goodreads-books` data set. 
+This corresponding term paper is divided into four chapters. The first chapter considers some meta information about the data set and an extensive explorative data analysis follows. In the fourth chapter we will look for some patterns and anomalies using a clustering algorithm. 
+Finally, the results are presented in a summary.
+
+
+## Meta Information
+The `Goodreads-books` data set is available on the platform [www.kaggle.com](`www.kaggle.com`) and was created on May 25 in year 2019 using the API [^1]
+[https://www.goodreads.com/api](`https://www.goodreads.com/api`) of the Website [https://www.goodreads.com](https://www.goodreads.com).\
+Goodreads is a social cataloging platform, that allows users to search freely its database of books, annotations and reviews. Individuals can sign up and register books to generate library catalogs and reading lists as well as create their own groups of book suggestions, surveys, blogs, polls and discussions.\
+To have more scope during the analysis of the data set, additional information of the books like the `price` and the `genre` was gathered.\
+The `genre` data was added manually while the `price` data was scrapped from the website [https://isbndb.com](https://isbndb.com) [^2].
+The following table sums up which features are included in the explored data set.
+
+[^1]: An application programming interface is a part of the program that is made available by a software system to other programs for connection to the system [@api]. 
+
+[^2]: The code for the web crawler is available on my GitHub profile Janalytics94 [https://github.com/Janalytics94](https://github.com/Janalytics94).
+
+```{r Information of the features}
+variables<-c("BookID", "Title", "Authors", "Average_raiting", "ISBN", "ISBN 13", "Language_code", "Num_pages", "Ratings_count", "Text_reviews_count", "Pubication_date", "Publisher", "Price", "Genre")
+explanation<-c("The unique ID for each book/series",
+ "The title of the book",
+  "The author of the particular book", "the average rating of the books, as decided by the users",
+  "The ISBN number, gives detailed information about a book - such as edition and publisher",
+  "The new format for ISBN, implemented in 2007. 13 digits",
+  "Tells in which language the book is written",
+  "The number of pages of the book",
+  "Contains the number of ratings given for the book",
+  "Has the count of reviews left by users",
+  "The date when the book was published",
+  "The publisher of the book", 
+  "The price in $ of each book", 
+  "The genre of the book")
+data<-as.data.frame(explanation,variables)
+```
+
+
+```{r tab1}
+knitr::kable(data, booktabs=TRUE, align = "l", "latex", caption = "The Explanation of the Features") %>%
+  kable_styling(latex_options = c("striped", "hold_position", "scale_down"))
+```
+Table \ref{tab:tab1} sums up the features which are considered in this analysis.
+Each book added to the data set gets a unique `bookID` and can be clearly identified by this ID in our data set.
+
+The features `average_rating`, `num_pages`, `ratings_count`, `text_reviews_count` and `price` are quantitative, metrical, sortable data features, which are expressed by numbers.
+
+The `author`, `title`, `language_code`, `publisher`, `ISBN` and `ISBN 13` of each books are nominal variables and represented by characters or strings.
+`ISBN` and `ISBN 13` are used as reference numbers for each book and are valid worldwide.
+
+The `publication_date` is an ordinal variable as we can order the books considering the dates they have been published.
+
+```{r Load data}
+# load data
+goodreads <- read.csv("goodreads.csv", sep=",", header=TRUE)
+
+# renaming column price
+colnames(goodreads)[12] <- "price"
+```
+
+Table \ref{tab:tab2} gives an overview of the data set.
+
+```{r tab2}
+knitr::kable(head(goodreads, 5), booktabs=T, align = "l", "latex", caption = "The Goodreads-Books-Dataset") %>%
+  kable_styling(font_size = 8, latex_options = c("scale_down", "hold_position", "striped"))
+```
+
+# Data Cleansing and Transformation
+\
+Now, to get an overview of our data, we want to know the shape and the data types R assigned to them while loading.
+
+```{r Shape, echo=T}
+dim(goodreads)
+```
+
+```{r tab3}
+table <- data.frame(sapply(goodreads, class))
+colnames(table) <- ""
+knitr::kable(table, 
+             align = "c", 
+             "latex", 
+             caption = "Datatypes")%>%
+  kable_styling(position = "center", font_size = 8, latex_options = c( "hold_position", "striped"))
+
+```
+Our data set contains 11.127 different books and 13 columns, which represent the features of each book. Table \ref{tab:tab3} summarizes the data types of each feature.
+The features `average_rating`,  `isbn13`, and `price` are loaded as numeric variables while `num_pages`, `ratings_count` and `text_reviews_count` are loaded as integer. Every other variable is red in as a factor by R. In order to work with our data we have to convert some of them into different formats. 
+The publication date will be converted as a date of the format month-day-year and the `isbn13` should be treated as a nominal variable so we will change it to the data type factor.
+
+```{r Data transformation, echo=T}
+# Converting publication_date
+goodreads$isbn13 <- as.factor(goodreads$isbn13)
+goodreads$publication_date <- lubridate::mdy(goodreads$publication_date)
+```
+
+After converting our variables to the desirable format we want to find out if we have to deal with any missing values. 
+
+The following Table \ref{tab:tab4} shows that only the feature `price` contains 1.898 missing values.
+```{r tab4}
+## Finding out where missing values are
+knitr::kable(sapply(goodreads, function(x) length(which(is.na(x)))),caption="Missing Values" , align = "c", "latex")%>%
+  kable_styling(position = "center", full_width=F,font_size = 8, latex_options = c( "HOLD_position", "striped"))
+```
+
+Bearing this in mind we move on to our analysis.
+\
+
+# Data Exploration through Descriptive Statistics
+\
+The following questions shall guide us through our data exploration.
+\
+
+>* _Which are the most rated Books?_
+
+>* _Which Author wrote the most Books?_
+
+>* _Who are the Top Highly Rated Authors?_
+
+>* _How do we deal with the Price Data of the Books?_
+
+>* _Which Book Genres are represented in our Data Set?_
+
+>* _How is the Rating of the Books distributed?_ 
+
+>* _Which Books have the most Pages?_
+
+>* _How are Books Distributed across Different Languages?_
+
+>* _Is there a Connection between the Numeric Features of the Books?_ 
+
+
+## Which are the most rated Books?
+\
+According to Figure \ref{fig:fig1}, the most rated books are those, which are part of a series of books, such as Twillight or Harry Potter. 
+```{r fig1, fig.align="center", fig.height = 3, fig.width = 6, fig.cap="The most rated Books", fig.pos="H"}
+#Most rated
+most_rated <- arrange(goodreads, desc(ratings_count))
+fig1 <- ggplot(head(most_rated,10), aes(x=title, y=ratings_count, fill=title), size=1.3)+
+  geom_bar(stat="identity", show.legend = F) + scale_fill_brewer(palette="Spectral")+theme_minimal()+
+  geom_label(aes(label=ratings_count), size=2)+
+  theme(legend.position = "none")+
+  theme(axis.text.y = element_text(size=5), axis.title.x = element_text(size = 5), axis.text.x = element_text(size = 5))+
+  labs(x="", y="Counts of raiting")+ 
+  ylim(0,5000000) + coord_flip() 
+fig1
+```
+
+The Harry Potter Saga appears several times in our plot. We can assume that they belong to the most read books as all were rated pretty often. The book Twillight has received with 4.597.666 by far the most ratings.
+We also want to plot the books which got the most text reviews to explore if there is a possible connection between those features, which we will examine later.
+
+```{r most_text_reviews_plot, fig.align="center", fig.height =3, fig.width = 6, fig.margin=T, fig.cap="Books with most Text Reviews", fig.pos="H"}
+# Most text reviews
+most_text_reviews <- arrange(goodreads, desc(text_reviews_count))
+most_text_reviews_plot <- ggplot(head(most_text_reviews,10), aes(x=title, y=text_reviews_count, fill=title), size=1.3)+theme_minimal()+
+  geom_bar(stat="identity") + scale_fill_brewer(palette="Spectral")+
+  geom_label(aes(label=text_reviews_count), size=2)+
+  theme(legend.position = "none")+
+  labs(title="", x="", y="Counts of text raiting")+
+  theme(axis.text.y = element_text(size=5), axis.title.x = element_text(size = 5), axis.text.x = element_text(size=5))+
+  scale_y_continuous(limits=c(0,100000)) + coord_flip() 
+most_text_reviews_plot
+```
+
+The Book Twillight and the third book of the Harry Potter Series appear again in the Bar plot in Figure \ref{fig:most_text_reviews_plot}. Also the book The Catcher in the Rye appears in both plots, which lets us assume that there might be a connection between the variables `text_reviews_count` and `ratings_count`.
+
+## Which Authors published the most Books?
+\
+Moving on to our next question we want to find out which authors published the most books.
+```{r most_publ_books_plot, fig.height = 3, fig.width = 6, fig.align="center", fig.cap="Authors who published the most Books", fig.margin=T, fig.pos="H"}
+# Author of most books
+author_most_books <- goodreads%>% group_by(authors) %>% count(authors) %>% arrange(desc(n))
+most_publ_books_plot <- ggplot(head(author_most_books,10), aes(x=authors, y=n, fill=authors), size=1.3)+
+  geom_bar(stat="identity") + scale_fill_brewer(palette = "Spectral")+theme_minimal()+
+  geom_label(aes(label=n), size=2)+
+  theme(legend.position = "none")+ labs(title = "", x="", y="Number of published books")+theme(axis.text.y = element_text(size=5), axis.text.x = element_text(size = 5),axis.title.x = element_text(size=5))+coord_flip()
+most_publ_books_plot
+```
+\
+According to the Figure \ref{fig:most_publ_books_plot} the authors Stephen King and P.G. Wodehouse are, with a number of 40 books published, the front-runners, followed by Rumiko Takahsashi with 39 published books.
+To elaborate if they are also the most successful ones, we want to find out if they also received a high `average_rating`, which brings us to our next question.
+
+##  Who are the Top Highly Rated Authors?
+\
+We are only considering books which received an `average_rating` greater than three and authors who published more than ten books. 
+
+```{r highly_rated_plot, fig.cap="The Top Highly Rated Authors \n (only authors with ten or more books)", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center"}
+## 10 top highly rated
+highly_rated_author <-filter(goodreads, average_rating>=3) %>% group_by(authors) %>%  summarize(avg=mean(average_rating), books=n()) %>% arrange(desc(avg)) %>% filter(books>10)
+
+# Die 10 Besten von den Besten
+highly_rated_plot <- ggplot(head(highly_rated_author,10))+geom_bar(aes(x=authors, y=books, fill=avg),stat="identity")+
+  geom_hline(yintercept = c(10, 20, 30, 40), linetype="dashed", alpha=0.1)+
+  coord_flip()+
+  scale_y_log10()+ theme_minimal()+
+  labs(y="Number of books", x="", title = "",
+       subtitle = "", fill="Averaged rating")+theme(axis.text.y = element_text(size=6), axis.text.x = element_text(size = 6), axis.title.y = element_text(size=6), axis.title.x = element_text(size = 6), legend.title = element_text(size=6))
+highly_rated_plot
+```
+
+The corresponding Bar plot in Figure \ref{fig:highly_rated_plot} illustrates that the success of an author might not depend on the number of books he or she published. The author Stephen King does not appear in the plot at all so in the mean he didn't receive an averaged rating greater than three. The author P.G Wodehouse does appear again but on average he got an average rating around 4.2. The same goes for Rumiko Takahashi.  The most successful authors, who received an average rating  on average around 4.5 are the writers of the famous Harry Potter books J.K. Rowling and the Lord of the Rings author J.R.R. Tolkien. The most successful one seems to be Hiromu Arakawa/Akira Watanabe. Jane Austen is also taken into account. According to our given data all authors wrote less than 20 books over the past years and are on average more successful than the ones who published more books.  
+
+## How do we deal with the Price Data of the Books?
+\
+Regarding the price data of the books we already know that 1898 values are missing. In order to find out how to handle those missing values we want to know how the price is distributed.
+
+```{r moments_price_tab}
+table_price <- summary(goodreads$price)
+table_p <- as.matrix(table_price)
+knitr::kable(t(table_p), align = "c", "latex", caption = "Statistical Summary of Price")%>%
+  kable_styling(font_size = 8, latex_options = c("hold_position", "striped"))
+```
+
+The Table \ref{tab:moments_price_tab} illustrates that the minimum price of a book is \$ 0.01 and the maximum price is at \$ 249.914,95. 
+Looking at the following Box plot in Figure \ref{fig:box_price}  we see that only one book has such a high price. 
+
+```{r box_price, fig.cap="Box Plot Price in USD with Outliers", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center", fig.pos="H"}
+price = data.frame(c(goodreads[,12]))
+colnames(price)<-"Price"
+box_price <- ggplot(data=price, aes(x="", y=Price))+theme_minimal()+geom_rug()+
+  geom_boxplot()+ coord_flip()
+box_price
+```
+Considering the huge differences in prices this outlier will be removed from our data set as it will distort our following analysis.
+Now we will create a sample of $n=1000$ of the data set to find out how much the outliers effect the statistical key figures like the mean and the median.
+
+```{r Bootstraping price, echo=TRUE}
+#Creating sample
+set.seed(123)
+ind<-sample(nrow(goodreads), size=1000, replace=T)
+mean(goodreads$price[ind], na.rm = T)
+mean(goodreads$price,  na.rm = T)
+median(goodreads$price[ind], na.rm = T)
+median(goodreads$price, na.rm = T)
+```
+
+We see that the mean of the whole data set and the mean of the sample show huge aberrance where as the median values of both sets are almost similar. Due to those massive differences the prices of books causes, instead of the mean we use the median to replace our missing values as it is less sensitive against outliers [@medianmean].
+
+```{r Replacing NaNs, echo = TRUE}
+# Replacing NaN values with median of price
+goodreads$price<-goodreads$price %>%
+  replace_na(median(goodreads$price, na.rm = T))
+```
+Now the data is classified in different price classes.
+As we can see in our Scatter plot in Figure \ref{fig:price_scatter} we separated the books in fife different prices classes. The range of the different classes are $D\in (0, 10]$ for the first, $D\in (10, 50]$ for the second, $D\in (50, 100]$ for the third, $D\in (100, 200]$ for the forth and $D\in (200, 800]$ for the fifth price class.
+The majority of the books is arranged in the first and in the second price class. Those also received an average rating between 3.0 and 5.0. There are also books which are represented in all five price classes who received an average rating of 0 but only in the first four price classes are occurrences who received the highest possible average rating of 5.
+
+```{r price_scatter, fig.cap="Scatterplot Price in USD", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center", fig.pos="H"}
+# Find and remove outlier for the scatter Plot
+goodreads <- goodreads[-c(10553),] # 
+price_scatter <- goodreads %>% 
+   ggplot( aes(x=average_rating, y=price, color= factor(cut(price, c(0,10,50,100,200, 800)))))+ geom_point(position = "jitter")+theme_light()+labs(color="Price Class")+theme(axis.text.x = element_text(size=6), axis.title.x = element_text(size=6), axis.title.y = element_text(size=6), legend.text = element_text(size=6), axis.text.y = element_text(size = 6))
+price_scatter 
+```
+ 
+If we look at the Density plot in Figure \ref{fig:dens_p} of our price data we see a right-skewed or positive-skewed distribution.
+ 
+```{r skew_price, echo=TRUE}
+skewness(goodreads$price)
+```
+
+Right-skewed distributions are characterized by a positive skewness and the fact, that the mean value is significantly larger than the median, which applies here [@Lomax2007AnIT].
+
+```{r dens_p, fig.height = 3, fig.width = 5, fig.margin=T, fig.cap="Distribution of Price in USD", fig.align="center", fig.pos="H"}
+
+# Distribution of price
+dens_p <- ggplot(goodreads)+theme_minimal()+
+geom_density( aes(x=price), fill="#00AFBB", col='#00AFBB', alpha=.5, kernel="biweight")+
+                 labs(x="", title = "")+geom_rug()+
+  theme(axis.title.x=element_blank())
+                 
+dens_p
+
+```
+
+
+## Which Book Genres are represented in our Data Set?
+\
+In our data set the 71 different book genres are represented. We want to summarize the genres to different genre groups to reduce this number.
+
+```{r Count genre in original data, echo=TRUE}
+# Different Genre Data
+goodreads %>% group_by(genre) %>% count() %>% nrow()
+
+```
+
+The generated groups are Children and Young Readers, Novels, Main Genres which contains the genres Science Fiction, Crime, Thriller, Horror, Fantasy, Mystery and Southern Gothic, Science, Arts, International Books, Biography & Memoirs, Comic, Manga, Humor and Satire, Fiction and Other.
+Those books which genre is labeled as Unknown will be considered as an own group.
+
+```{r preparation_genre}
+
+# Children & Youngsters
+children <- goodreads[goodreads$genre=="Books for children and Cartoons"|goodreads$genre=="Books for Children and Young Readers"|goodreads$genre=="Childrens and young adult Fantasy"|goodreads$genre=="Children Fantasy"|
+          goodreads$genre=="Books for children and young adults"|goodreads$genre=="Realist young adult novels"|
+          goodreads$genre=="Books for children"|goodreads$genre=="Young adult Literature"|goodreads$genre=="Childrens Fiction"|goodreads$genre=="Realist young adult novels"|goodreads$genre=="Young Adult Fiction",]
+children$genre <- "Children and Youngsters"
+
+#No Genre
+unknown <- goodreads[goodreads$genre=="Unknown",]
+
+# Novels
+novels <- goodreads[goodreads$genre=="Novels"|goodreads$genre=="Womens Literature"|goodreads$genre=="Romance"|goodreads$genre=="Drama"|
+          goodreads$genre=="Drama Comedy"|goodreads$genre=="Adventure Novels"|goodreads$genre=="Erotic"|goodreads$genre=="Classic"|goodreads$genre=="Historical Novels"|goodreads$genre=="Hystorical Novels",]
+novels$genre <- "Novels"
+
+# Horror, SCIFI, Fantasy, Crime, Thriller etc
+SIFI_FAN_HORR_CRIME_THR <- goodreads[goodreads$genre=="Science Fiction"|goodreads$genre=="Fantasy"|goodreads$genre=="Crime"|goodreads$genre=="Thrillers"|
+          goodreads$genre=="Horror"|goodreads$genre=="Mystery"|
+          goodreads$genre=="Technothriller"|goodreads$genre=="Crime Fiction"|goodreads$genre=="Fantasy Fiction"|goodreads$genre=="Reliogious apocalyptic Science Fiction"|goodreads$genre=="Southern Gothic",]
+SIFI_FAN_HORR_CRIME_THR$genre <- "Main Genres"
+
+
+# Science
+sciences <- goodreads[goodreads$genre=="Science"|goodreads$genre=="Psychology"|goodreads$genre=="Economics"|goodreads$genre=="Naturalism"|goodreads$genre=="Anthropology"|goodreads$genre=="Analytic Philosophy",]
+sciences$genre <- "Science"
+
+# Arts
+arts <- goodreads[goodreads$genre=="Poetry"|goodreads$genre=="Epos"|goodreads$genre=="Religion"|goodreads$genre=="Philosophy"|goodreads$genre=="Ancient Greek Literature"|goodreads$genre=="Historical Literature"|goodreads$genre=="Literary Realism"|goodreads$genre=="Magical Realism",]
+arts$genre <- "Arts"
+
+# World Lecture
+int_books <- goodreads[goodreads$genre=="Greek Literature"|goodreads$genre=="Chinese Literature"|goodreads$genre=="American Literature"|goodreads$genre=="Beat Literature"|goodreads$genre=="Chinese Classics"|goodreads$genre=="Alternative Worldstories"|goodreads$genre=="Chinese-American Literature"|goodreads$genre=="French Literature"|goodreads$genre=="British Literature"|goodreads$genre=="English Literature",]
+int_books$genre <- "International Books"
+
+# Biography
+biografien <- goodreads[goodreads$genre=="Biography"|goodreads$genre=="Memoiren",]
+biografien$genre <- "Biography & Memoirs"
+
+# Comic Manga
+comic_manga <- goodreads[goodreads$genre=="Comic"|goodreads$genre=="Manga"|goodreads$genre=="Humor and Satire",]
+comic_manga$genre <- "Comic, Manga, Humor and Satire"
+
+# Short Stories
+short_stories_and_non_fi <- goodreads[goodreads$genre=="Short Stories"|goodreads$genre=="Non Fiction"|goodreads$genre=="Creative Nonfiction",]
+short_stories_and_non_fi$genre <- "Short Stories and Non Fiction"
+
+# Fiction
+fiction <- goodreads[goodreads$genre=="Literary Fiction"|goodreads$genre=="Philosophical Fiction"|goodreads$genre=="American Fiction"|goodreads$genre=="Transgressive Fiction"|goodreads$genre=="Historical Fiction",]
+fiction$genre <- "Fiction"
+
+sonst <- goodreads[goodreads$genre=="Travel Guides",]
+sonst$genre <- "Other"
+
+booksWithGenre <- rbind(children, novels, SIFI_FAN_HORR_CRIME_THR, sciences, arts, int_books, biografien, comic_manga, short_stories_and_non_fi, fiction, sonst, unknown)
+```
+
+```{r genre, fig.align="center", fig.height =3, fig.width = 6, fig.margin=T, fig.cap="Representation of Genre of Books", fig.pos="H"}
+# Genre data 
+genres <- booksWithGenre %>% group_by(genre) %>% count(genre) %>% arrange(desc(n))
+genre <- ggplot(head(genres, 10), aes(x=genre, y=n, fill=genre), size=2.3)+
+  geom_bar(stat="identity") + scale_fill_brewer(palette="Spectral")+
+  geom_label(aes(label=n), size=2)+theme_minimal()+
+  theme(legend.position = "none")+
+  labs(title="", x="Genre", y="")+
+  theme(axis.text.y = element_text(size=4), axis.title.x = element_text(size = 4), axis.text.x = element_text(size=3))
+genre
+```
+
+According to the Bar plot in Figure \ref{fig:genre}, 395 books belong to Arts, 349 to Biography & Memoirs, 183 to Children & Youngsters, 270 Comic, Manga, Humor and Satire, 227 to Fiction, 310 to International Books, 979 to Novels, 109 to Science and 1.290 to the Main Genres. The group Unknown includes 6.499 books. The plot provides an interesting insight into the genre data of books, but due to the high number of Unknown genre and the previous grouping, it is not representative for the data set.
+
+##  How is the Average Rating of the Books distributed?
+\
+Now we want to focus on the variable `average_rating` of each book.
+```{r Stat_Moments_average_rating}
+table.desc <- summary(goodreads$average_rating)
+table.prep <- as.matrix(table.desc)
+knitr::kable(t(table.prep), align = "c", "latex", caption = "Statistical Summary of Average Rating")%>%
+  kable_styling(font_size = 8, latex_options = c("HOLD_position", "striped"))
+```
+
+As we can see in Table \ref{tab:Stat_Moments_average_rating} and in the Box plot in Figure \ref{fig:bp_avr}, the evaluation of the book is between $D\in [0.5]$, the median is 3.96 and the mean is 3.93. 
+There are a few books which received an `average_rating` less than 3 and also a few which received an `average_rating` over 4.5 or 5.
+The majority of the data is located between 3.5 and 4.3. 
+
+```{r bp_avr, fig.align="center", fig.height = 4, fig.width = 4, fig.margin=T, fig.cap="Box Plot of Average Rating", fig.pos="H"}
+#Boxplot
+avg = data.frame(c(goodreads[,3]))
+colnames(avg) <- "average_rating"
+bp_avr<-ggplot(data=avg, aes(x="", y=average_rating))+
+  geom_boxplot()+geom_rug()+
+  labs(y="", x="")+ theme_minimal()+
+  coord_cartesian(ylim = c(0,5))+theme(axis.text.x = element_text(size=6), axis.text.y = element_blank())+coord_flip()
+bp_avr
+```
+
+To get even more insight a distribution plot of the `average_rating` was created.
+Again we create a sample of the data with $n=1000$ to check if there are huge differences between the key figures.
+
+```{r Bootstrapping average rating, echo = TRUE}
+# Creating a sample of the data
+set.seed(123)
+ind<-sample(nrow(goodreads), size=1000, replace=T)
+mean(goodreads$average_rating[ind])
+mean(goodreads$average_rating)
+median(goodreads$average_rating[ind])
+median(goodreads$average_rating)
+```
+
+As we removed the outliers before, the moments do not differ.
+
+```{r den, fig.height = 3, fig.width = 5, fig.margin=T, fig.cap="Distribution of Average Rating", fig.align="center", fig.pos="H"}
+
+# Distribution of average rating & histogramm
+den <- ggplot(goodreads, aes(x=average_rating))+geom_histogram(aes(y=..density..),
+                                                            binwidth = .5,
+                                                            colour="black",fill="white")+
+  geom_density(alpha=.2, fill="#FF6666")+geom_rug()+theme_minimal()+
+  geom_vline(aes(xintercept=round(median(average_rating),2)), linetype="dotted")+
+  geom_vline(aes(xintercept=round(mean(average_rating),2)), linetype="solid", color="red")+
+  theme(axis.title.x=element_blank())
+                 
+den
+
+```
+
+The Density plot in Figure \ref{fig:den} shows a left-skewed distribution and the `average_rating` might be normally distributed. The majority of the books are rated between 3.7 and 4.3 approximately. Books having scores near 5 are extremely rare. Also we want to find out which values received the value 0. This leads also to the conclusion that if a person does read a book and end up not liking it, it still get a minimum of around 2 stars, just for the effort they put up to read the book.
+
+### Testing Normal Distribution using the Shapiro-Wilk-Test
+\
+To support our assumption of a normal distribution of the `average_rating` we perform a Shapiro-Wilk-Test [@mohdShapiro].
+The test can be applied to a population which size has to be between 3 and 5000. As a level of significance we consider $alpha = 0.05$.
+Our hypotheses are the following:\
+
+$H_{0}$: The `average_rating` follows a normal distribution.\
+$H_{1}$: The `average_rating` follows not a normal distribution.
+```{r test normal-Dist., echo=TRUE}
+#Creating sample
+#set.seed(123)
+ind<-sample(nrow(goodreads), size=250, replace=T)
+shapiro.test(goodreads$average_rating[ind])
+
+```
+As the p-value is smaller than $2.2e-16$ which is smaller than $0.05$ for a sample size of 250 data points we do reject $H_{0}$. 
+Hence the `average_rating` does not follow a normal distribution, considering a population of 250 data points.
+
+##  Which Books have the most Pages?
+\
+Now we want to find out which books have the most pages. 
+\
+We plot the five books with the most pages which is illustrated in the Bar plot in Figure \ref{fig:most_pages_plot}. The books which represent our most significant outliers are The Complete Aubrey/Maturin Novels (5 Volumes) and The Second World War. The other books which are between a size of pages between 3.000 and 40.000 are the Summa Theologica 5 Vols., Remembrance of Things Past (Boxed Set) and the Harry Potter Collection. The data points which appear in this plot are mostly listed as sets, which would explain the high number of pages.
+\
+
+```{r most_pages_plot, fig.height = 3, fig.width = 5, fig.margin=T, fig.cap="Books with most Pages", fig.pos="H", fig.align="center"}
+# Top 5 books with most pages
+most_pages <- arrange(goodreads, desc(num_pages))
+most_pages_plot<- ggplot(head(most_pages,5), aes(x=title, y=num_pages, fill=title), size=1.3)+geom_bar(stat="identity")+ theme_minimal()+
+  geom_label(aes(label=num_pages), size=2)+
+  scale_fill_brewer(palette="PiYG")+ 
+  theme(legend.position = "none")+
+  labs(title="", x="", y="Total Pages")+
+  coord_flip()+
+  theme(axis.text.y = element_text(size=5), axis.title.x = element_text(size = 5),axis.text.x = element_text(size = 5))
+most_pages_plot
+```
+
+Furthermore there are books which have a considerably low number of pages. Those are listed in the following Table \ref{tab:Audiobooks} and are probably audio books.
+```{r Audiobooks}
+## Some records have the value "NOT A BOOK" in the column "author"
+notAbook <- filter(goodreads, authors=="NOT A BOOK")
+knitr::kable(subset(notAbook, select=c("title", "authors", "num_pages", "price", "genre")), align = "l", caption = "Books with No Authors")%>%
+  kable_styling(font_size = 8, latex_options = c("scale_down", "HOLD_position", "striped"))
+```
+
+Now we want to examine if the high number of pages has an impact to the `average_rating` of each book.
+The following Figure \ref{fig:plot_np_avg} of multiple Box plots illustrates a slight decrease in the average rating with the increase of the number of pages from 0 to 300. Then there is a reverse trend.
+
+```{r plot_np_avg, fig.height = 3, fig.width = 6, fig.margin=T, fig.cap="Average Rating depending on Number of Pages", fig.align="center", fig.pos="H"}
+
+#options(repr.plot.width = 18 , repr.plot.height = 13)
+plot_np_avg <- ggplot(goodreads, aes(x=cut(num_pages,
+                         breaks=c(seq(0, 1000, by=100), 2000, 3000, 6600)),
+                   average_rating))+
+  theme_classic()+
+  geom_boxplot(fill="#69b3a2")+
+  stat_summary(fun.y=median, geom="line", aes(group=1), colour="#E7B800", lw=5)  + 
+  stat_summary(fun.y=median, geom="point", colour="#FC4E07", size=3)+
+  coord_cartesian(ylim=c(2, 5))+
+  labs(x='Number of pages', y='Average rating', fill='Averaged rating')+
+  scale_x_discrete(labels=c('0-100', '100-200', '200-300','300-400',
+                            '400-500', '500-600', '600-700',
+                            '700-800', '800-900', '900-1000',
+                            '1000-2000', '2000-3000', '3000-6576'))+theme(axis.text.x = element_text(size=5), axis.title.x = element_text(size=6), axis.title.y = element_text(size=6))
+  
+
+plot_np_avg
+
+
+```
+
+Looking more closer into the variable `num_pages` we want to find out how the number of pages is distributed. The  Density plot in Figure \ref{fig:dist_numP} shows also as right skewed distribution as the right tail is significantly drawn out compared to the other side.  
+
+```{r dist_numP, fig.align="center", fig.pos="H", fig.height = 3, fig.width = 6, fig.margin=T, fig.cap="Distribution of Number of Pages"}
+#options(repr.plot.width = 18, repr.plot.height=8)
+dist_numP<- ggplot(goodreads)+
+  theme_classic()+
+  geom_density(aes(num_pages), fill="#00AFBB", col='#00AFBB', alpha=0.3)+
+                 labs(x="Number of Pages", title = "")+
+                 theme(plot.title = element_text(hjust=0.5, size=10),
+                       axis.text.x = element_text(size=10))+
+                 geom_vline(aes(xintercept=round(mean(num_pages),2)), linetype="dotted")+
+                 geom_text(aes(x=337, y=0.0028, label="mean"), size=2, nudge.y=10)+
+                 scale_y_sqrt()+
+                 scale_x_continuous(breaks=c(round(mean(goodreads$num_pages, )), 1000, 2000, 4000, 6000))+theme(axis.text.y = element_text(size=6), axis.text.x = element_text(size = 6),axis.title.y = element_text(size=6), axis.title.x = element_text(size = 6))
+dist_numP
+
+```
+
+```{r moments, echo=T}
+sd(goodreads$num_pages)
+median(goodreads$num_pages)
+mean(goodreads$num_pages)
+skewness(goodreads$num_pages)
+```
+Let us have a look at the statistical moments.\
+The standard deviation is 241.117, the median is 299, the mean 336.40 and the skewness is 4.27, which also confirms the existence of a right skewed distribution as it is positive and greater than zero.
+
+## How are Books distributed across different Languages?
+\
+The considered books are translated into different languages. 
+As we can see in the following Bar plot in Figure \ref{fig:l} most books are in English which is split into different sub groups of American, British, Canadian and Other English.
+Books in Japanese or Chinese have the highest `average_rating`.
+
+```{r l, fig.height = 3, fig.width = 5, fig.pos="H", fig.align="center", fig.cap="Number of Books in each Language with Averaged Ratings (Only Languages with more than 5 Books)"}
+languages <- goodreads %>%group_by(language_code)%>%summarize(avg=mean(average_rating),lan=n())%>%arrange(lan)%>%filter(lan>5)
+
+languages$language_code<-c("Eng-Canadian","Portugese", "Greece","Chinese","Multiple","Japanese","German","French", "Eng-British", "Spanish", "Eng-American", "Eng-other")
+
+
+
+#Plot
+l<- ggplot(languages)+
+  theme_classic()+
+  geom_bar( aes(x=factor(language_code, levels = as.character(language_code)),
+                y=lan, fill=avg), stat="identity")+
+  geom_hline(yintercept = c(10, 100, 1000, 10000), linetype="dashed", alpha=0.1)+
+  coord_flip()+
+  scale_y_log10()+
+  scale_fill_gradient(low="#4E84C4", high="#292252")+
+  labs(y="Number of Books in given Language", x="", title = "",
+       subtitle = "", fill="Averaged rating")+theme(axis.text.y = element_text(size=6), axis.text.x = element_text(size = 6), axis.title.y = element_text(size=6), axis.title.x = element_text(size = 6), legend.title = element_text(size=6), legend.text = element_text(size = 6))
+l
+
+```
+
+## Is there a Connection between the Numeric Features and the Rating of the Books?
+\
+
+In order to find out if the there is any correlation between the numeric variables of our record we plot the correlation of our data. The correlation after Bravais-Pearson [@pearson] is calculated which follows the following formula: 
+$$\rho = \frac{\sum_{i=1}^{n}(x_i * y_i)- n* \overline{x}*\overline{y}}{\sqrt{\sum_{i=1}^{n}(x_i^{2})-n*\overline{x}^{2}}*\sqrt{\sum_{i=1}^{n}(y_{i}^{2})-n*\overline{y}^2}},$$ 
+where $\overline{x}$ and $\overline{y}$ are the arithmetic mean of x and y.
+
+```{r data prep corr}
+# Possible Data Correlation between numeric variables
+numericVs<-subset(goodreads, select=c("average_rating","num_pages","ratings_count","text_reviews_count", "price")) #"price"))
+corr <- round(cor(numericVs),1) # Bravais-Pearson as default
+```
+
+```{r figCorr, fig.height = 2, fig.width = 4, fig.margin=T, fig.cap="Correlation between Numeric Variables", fig.pos="H"}
+# Plot
+figCorr<-ggcorrplot(corr, hc.order=T, outline.color = "white",
+           ggtheme=theme_bw(),
+           colors=c("#6D0EC1","white","#E46726"),
+           legend.title = "Correlation",
+           lab=F,
+           lab_size= 5) +
+  ggplot2::labs(x ="", y="") +
+  ggplot2::theme(axis.text.y = element_text(size=6), axis.text.x = element_text(size=6), 
+        legend.text = element_text(size=6), legend.title = element_text(size=6), 
+        axis.title.x = element_blank(), axis.title.y = element_blank())
+figCorr
+```
+
+The Correlation plot in Figure 15 shows that there is a positive correlation between `text_reviews_count` and `ratings_count` with a value of 0.9 which leads to the conclusion that every user who rated a book, also left a text review. There is no correlation between the other variables, except between the feature `average_rating` and `num_pages` which shows small correlation of 0.2. Also there is a correlation between `num_pages` and `price` which we will further explore in the Predictive Analysis.
+
+The Scatter plot regarding Figure \ref{fig:scatter} below illustrates again the high correlation between the `text_reviews_count` and the `ratings_count`. We have a almost complete positive linear correlation.
+
+```{r scatter, fig.height = 2, fig.width = 4, fig.margin=T, fig.cap="Scatterplot of Text Reviews Count and Ratings Count", fig.pos="H"}
+### Scatter plot of text_reviews_count and ratings_count
+scatter<-ggplot(goodreads, aes(x=text_reviews_count, y=ratings_count))+geom_point()+
+  geom_smooth(method = lm, se=F)+ 
+  labs(y="Text Ratings Count", x="Text Reviews Count")+theme_minimal()+
+  theme(axis.text.y = element_text(size=6), axis.text.x = element_text(size = 6), axis.title.y = element_text(size=6), axis.title.x = element_text(size = 6))
+scatter
+```
+
+
+# Cluster Analysis
+
+## Are there any Patterns or Peculiarities between the Price of the Books and the Number of Pages?
+
+At the end of our data analysis we want to explore, if we could find any patterns or peculiarities between the number of pages of books and the price. We will use the K-Means Clustering which is a simple unsupervised machine learning algorithm that groups a data set into user-specified number (k) of clusters.
+The Scatter plot regarding Figure \ref{fig:price_num_pa_scatter} could lead to the assumption shows a slight correlation between those two variables.
+With respect to the genre we can see that books, which belong to the genres Comic, Manga, Humor and Satire or Fiction do not have a high number in pages and are usually located in a price class below $100, which makes sense as those books mostly contain drawings respectively pictures.
+One book, which belongs to the genre Novels, has over 6.000 pages and has a price of almost $300. This might be a first edition of a very famous book. Another one, which belongs to the genre Arts seems to be pretty expensive but does not have a significantly high number of pages [@hastie09].
+
+
+```{r price_num_pa_scatter, fig.cap="Scatterplot Price in USD", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center", fig.pos="H"}
+booksGenre <- rbind(children, novels, SIFI_FAN_HORR_CRIME_THR, sciences, arts, int_books, biografien, comic_manga, short_stories_and_non_fi, fiction, sonst)
+
+price_num_pa_scatter <- booksGenre %>% 
+   ggplot( aes(x=num_pages, y=price, color= genre))+ geom_point(position = "jitter")+labs(color="Genre")+
+  theme_light()+
+  theme(axis.text.x = element_text(size=6), axis.title.x = element_text(size=6), axis.title.y = element_text(size=6), legend.text = element_text(size=6), axis.text.y = element_text(size = 6), legend.title = element_text(size=6))
+price_num_pa_scatter 
+```
+
+To perform the K-Means-Cluster-Analysis we need to prepare our data at first.
+We select the features `price` and `num_pages` and using the Z-Score [@Sharma] to remove the outliers and transform the data. Outliers have to be removed from the data set as the K-Means is highly sensitive against them. The results of the algorithm might be corrupted by them as it is a distance based procedure. A typical distance measure is either the Euclidean distance or the Mahalanobis distance [@James2013].  
+The Z-Score follows the following formula:
+
+$$Z = \frac{(X -\mu)}{\sigma},$$
+
+where $\mu$ is the mean and $\sigma$ is the standard deviation.\
+
+The Z-Score tells you how many standard deviations you are away from the mean. If a Z-Score is equal to 0, it is on the mean.
+A positive Z-Score indicates that the raw score is higher than the mean while a negative one indicates that the raw score is below the mean.
+
+
+```{r KMeans}
+#preparing data
+# Clustering prices according to the number of pages
+data <- booksWithGenre %>% 
+  select(price, num_pages)
+
+# removing outliers using Z-score
+price_zscore <- data %>% mutate(zscore_price = 
+                                  (price - mean(price))/sd(price))
+num_pages_zscore<- data %>% mutate(zscore_numpages =
+                                     (num_pages - mean(num_pages))/sd(num_pages))
+
+dataPrep <- data.frame(zscore_price = 
+                         price_zscore$zscore_price, zscore_numpages = 
+                         num_pages_zscore$zscore_numpages)
+
+# Scale the data
+dataPrep_scale <- scale(dataPrep)
+```
+In order to find out which optimal number of clusters to chose we use the Elbow Method .
+It involves running the algorithm multiple times over a loop, with an increasing number of cluster choice and then plotting a clustering score as a function of the number of clusters. Furthermore we use the method With-in-Sum-Of-Squares (WSS) which indicates the total distance of data points from their respective cluster centroids [@Syakur_2018].
+The plot in Figure \ref{fig:optimal_clusters_plot} looks like the bend of an elbow. Usually you chose the number of clusters where the line bends but in our case it is not clear which number ob clusters we should take so we will perform a cluster analysis using $k = 5 = 6$ clusters.
+
+```{r optimal_clusters_plot, fig.cap="Optimal Number of Clusters", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center",  fig.pos="H"}
+optimal_clusters_plot <- fviz_nbclust(x = dataPrep_scale,FUNcluster = kmeans, method = 'wss' )
+optimal_clusters_plot
+```
+A cluster refers to a collection of data points aggregated together because of certain similarities.
+
+````{r selectClusters}
+k5 <- kmeans(dataPrep_scale, centers=5)
+k6 <- kmeans(dataPrep_scale, centers=6)
+
+clusterplot5 <-fviz_cluster(k5, data=dataPrep_scale)
+clusterplot6 <-fviz_cluster(k6, data=dataPrep_scale)
+
+```
+
+Looking at both Cluster plots in Figure \ref{fig:clusterplot5} and Figure \ref{fig:clusterplot6} we can see that there is not a significant difference between selecting $k=5$ or $k=6$ clusters. 
+
+```{r clusterplot5, fig.cap="Cluster Plot Five Clusters", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center",  fig.pos="H"}
+clusterplot5
+```
+
+Referring to the Cluster plot with $k = 5$ we can see that the one cluster represents the most expensive books. They do not have necessarily a high number of pages.
+Those book might be first editions or maybe expensive Science books.
+It could be assumed that this cluster represents the data with extreme values, because the majority is located in the other four clusters.
+Another cluster represents cheap books, which also do not have a lot of pages. Those might be the books like Comics or Mangas as well as Short Stories or Audio Books. Books which have been published already a couple of years ago could also be considered. On the other hand Comics could also be included into the violet cluster as some of them might have collector's value.
+
+The clusters which are located on the left of the graphic show only slight deviations in price or number of pages.
+
+The Cluster plot with $k = 6$ acts almost equally.  
+
+```{r clusterplot6, fig.cap="Cluster Plot Six Clusters", fig.height = 3, fig.width = 6, fig.margin=T, fig.align="center",  fig.pos="H"}
+clusterplot6
+```
+With respect to the results of our cluster analysis and the previous exploration of a correlation between `price` and `num_pages` we can say that there are patterns between those two features but a high number in pages does not necessarily lead to a higher price. Other features should be taken into the account as for example the publication date and the success of an author.
+
+\newpage
+# Summary and Outlook
+\
+In this term paper, we wanted to create good book recommendations based on the information people read at Goodreads. However, after the analysis, we found that we can not define whether a book is worth recommending based on the number of books a certain authors has published, the average rating a book has received, the count of ratings, the price or the number of pages a book has.
+
+Through the above analysis, we came to the following conclusions:
+ 
+>* The average book `avergage_rating` is around 4 and most of the books average rating is located from 3 to 4.5.
+>* The average book rating does not follow a normal distribution according to the Shapiro-Wilk Test
+>* The number of books an author published does not lead to a higher success of the author.
+>* Authors who created a series of books like Harry Potter, The Lord of the Rings or Twillight seem to be more successful than others.
+>* There is a positive correlation between the features `text_reviews_count` and `ratings_count` with a value of 0.9 which leads to the conclusion that every user who rated a book, also left a text review.
+>* If a person does read a book and end up not liking it, it still get a minimum of around 2 stars, just for the effort they put up to read the book. 
+>* Most books which are translated in English or Japanese received a respectively high average rating.
+>* A high number in pages does not lead to a higher price.
+
+In addition to the performed data analysis we could further explore the features of the data set.
+A timeline of the ratings of the books could be helpful to determine the success of an author. Also we could try to predict the genre of the books which are labeled as unknown using a classification algorithm. 
+Furthermore the text reviews could be gathered and a sentiment analysis using Natural Language Processing (NLP) could be performed, developing a recommending system based on those reviews and the additional features of each book. There are so many options!
+
+\newpage
+
+# References
+
