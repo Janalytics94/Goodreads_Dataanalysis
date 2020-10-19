@@ -8,4 +8,4 @@ The genre data was added manually while the price data was scrapped from the web
 
 Notes: 
 1. Please generate the R-Markdown File into a PDF Document.
-2. In the branch book_price_crawler the original book-2.csv data set is complemented by the price in $ and the goodreads.csv dataset is generated. The genre data was added manually
+2. In the branch book_price_crawler the original book-2.csv data set is complemented by the price in $ and the goodreads.csv dataset is generated. The genre data was added manually.
